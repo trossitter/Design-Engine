@@ -34,7 +34,7 @@
   .step-sub{margin:0 0 20px;color:var(--ink-2);font-size:14.5px;}
 
   /* dropzone */
-  .drop{border:1.5px dashed var(--line);border-radius:14px;background:var(--field);padding:30px 20px;
+  .drop{display:block;position:relative;border:1.5px dashed var(--line);border-radius:14px;background:var(--field);padding:30px 20px;
     text-align:center;cursor:pointer;transition:border-color .15s,background .15s;}
   .drop:hover,.drop:focus-within{border-color:var(--signal);}
   .drop.over{border-color:var(--signal);background:var(--signal-soft);}
@@ -42,7 +42,8 @@
   .drop__t{font-weight:650;margin:8px 0 2px;}
   .drop__s{color:var(--ink-3);font-size:13px;}
   .drop__browse{color:var(--signal-ink);text-decoration:underline;font-weight:600;}
-  input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}
+  .drop input[type="file"]{position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+    overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}
 
   .files{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;}
   .file{display:flex;align-items:center;gap:12px;background:var(--field);border:1px solid var(--line-2);
@@ -158,7 +159,7 @@
   <!-- INTAKE -->
   <section class="surface" id="view-intake">
     <h2 class="step-h">Add your design</h2>
-    <p class="step-sub">Drag in your Figma frames (PNG or JPG), or browse to upload. Add as many as your page needs.</p>
+    <p class="step-sub">Give it finished design frames; the engine returns live page code and opens a reviewable preview.</p>
 
     <label class="drop" id="drop" tabindex="0">
       <div class="drop__icon">⬆️</div>
