@@ -54,6 +54,9 @@ export function contractIntake() {
   if (i.figma.fileKey) intake.figma = { fileKey: i.figma.fileKey, nodeIds: i.figma.nodeIds };
   if (i.referenceUrl.trim()) intake.referenceUrl = i.referenceUrl.trim();
   if (i.freeText.trim()) intake.freeText = i.freeText.trim();
+  if (i.resources.length) intake.resources = i.resources.map(({ id, kind, sourceType, label, url, mediaType, fileBase64 }) => ({ id, kind, sourceType, label, ...(url ? { url } : {}), ...(mediaType ? { mediaType } : {}), ...(fileBase64 ? { fileBase64 } : {}) }));
+  if (i.testimonialIntent.trim()) intake.testimonialIntent = i.testimonialIntent.trim();
+  if (i.testimonialSelections.length) intake.testimonialSelections = [...i.testimonialSelections];
   return intake;
 }
 export function resourceContext() {

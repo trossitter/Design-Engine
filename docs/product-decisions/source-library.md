@@ -22,11 +22,13 @@ maintained source material—not copy pasted into a brief and allowed to go stal
 Example: intent `stress` should rank an `oxidative stress` testimonial highly, alongside
 other relevant approved proof. The UI proposes; the user chooses.
 
-## Track B now
+## Current implementation
 
-The MOCK surface stores linked and uploaded resources separately from the locked A3
-intake, represents access checking honestly as a demo, ranks testimonial metadata by
-intent, and records the user’s selected IDs. It does not perform real Google OAuth.
+The live surface sends linked and uploaded resources with the intake. The backend can
+extract plain-text, Markdown, CSV, JSON, and XML uploads today; unsupported documents
+and links remain attached but produce an explicit warning. There is no fake access
+verification or seeded testimonial ranking. Google OAuth, Drive folder traversal, PDF/
+DOCX extraction, and ranking over extracted testimonial records remain deployment work.
 
 ## Live contract addendum
 
@@ -56,5 +58,6 @@ returned by a Drive connector. OAuth credentials and raw long-lived access token
 not be placed in `POST /generate-page` or browser state. Uploaded files need the same
 resolved-resource shape after upload.
 
-Until that contract exists, `contractIntake()` remains exactly A3-compatible and the
-new resource data stays in the MOCK-only `resourceContext` seam.
+The current proof-of-concept sends resource metadata and small uploaded text files in the
+intake. Production should replace raw uploads with short-lived, server-resolved resource
+IDs before accepting large folders or long-lived Drive access.

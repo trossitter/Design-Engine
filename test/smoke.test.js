@@ -9,9 +9,10 @@ globalThis.localStorage = {
 };
 globalThis.matchMedia = () => ({ matches: true });
 globalThis.document = { documentElement: { dataset: {} } };
+globalThis.location = { hostname: 'localhost' };
 
 const { parseHash, nextStep, routes } = await import('../src/router.js');
-const { state, hasIntake, contractIntake, resourceContext, setTheme } = await import('../src/state.js?v=resources-1');
+const { state, hasIntake, contractIntake, resourceContext, setTheme } = await import('../src/state.js?v=live-1');
 const { planPage, generatePage, normalizePlan, normalizeResult, toGeneratePageRequest, ADAPTER } = await import('../src/api.js');
 const { intakeView } = await import('../src/components/intake.js');
 const { reviewView } = await import('../src/components/review.js');
@@ -45,51 +46,67 @@ test('intake requires a real modality and maps to the A3 contract', () => {
   });
 });
 
-test('source library preserves the A3 request and exposes the contract addendum separately', () => {
-  state.intake.resources = [{ id: 'drive-1', kind: 'testimonials', sourceType: 'link', label: 'Testimonial library', url: 'https://drive.google.com/file/d/abc/view', access: 'ready' }];
+test('source library sends attached sources through the live intake contract', () => {
+  state.intake.resources = [{ id: 'drive-1', kind: 'testimonials', sourceType: 'link', label: 'Testimonial library', url: 'https://drive.google.com/file/d/abc/view', access: 'unchecked' }];
   state.intake.testimonialIntent = 'stress';
   state.intake.testimonialSelections = ['oxidative-stress', 'daily-calm'];
-  assert.deepEqual(contractIntake(), { brief: { text: '# Brief' }, referenceUrl: 'https://example.com/reference' });
+  assert.deepEqual(contractIntake(), {
+    brief: { text: '# Brief' }, referenceUrl: 'https://example.com/reference',
+    resources: [{ id: 'drive-1', kind: 'testimonials', sourceType: 'link', label: 'Testimonial library', url: 'https://drive.google.com/file/d/abc/view' }],
+    testimonialIntent: 'stress', testimonialSelections: ['oxidative-stress', 'daily-calm']
+  });
   assert.deepEqual(resourceContext(), {
-    resources: [{ id: 'drive-1', kind: 'testimonials', sourceType: 'link', label: 'Testimonial library', url: 'https://drive.google.com/file/d/abc/view', access: 'ready' }],
+    resources: [{ id: 'drive-1', kind: 'testimonials', sourceType: 'link', label: 'Testimonial library', url: 'https://drive.google.com/file/d/abc/view', access: 'unchecked' }],
     testimonialIntent: 'stress',
     testimonialSelections: ['oxidative-stress', 'daily-calm']
   });
-  assert.equal(rankTestimonials('stress')[0].id, 'oxidative-stress');
+  assert.equal(rankTestimonials('stress', [{ id: 'oxidative-stress', title: 'Oxidative stress', themes: ['stress'] }])[0].id, 'oxidative-stress');
   const library = sourceLibraryView();
   assert.match(library, /Paste a Google Drive or file link/);
-  assert.match(library, /Access ready · demo/);
-  assert.match(library, /Top matches/);
+  assert.match(library, /Access checked during planning/);
+  assert.doesNotMatch(library, /demo/i);
 });
 
-test('mock plan and generation match the full-page response seam', async () => {
-  assert.equal(ADAPTER, 'MOCK');
+test('live planning and generation use backend responses without fixtures', async () => {
+  assert.equal(ADAPTER, 'LIVE');
+  const calls = [];
+  globalThis.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    calls.push(body);
+    if (body.options?.dryRunPlanOnly) {
+      return { ok: true, json: async () => ({ plan: { summary: 'Real plan', facts: [], sections: [{ sectionType: 'hero', intent: 'Lead' }] } }) };
+    }
+    const planned = body.plan?.sections || [];
+    return { ok: true, json: async () => ({
+      prUrl: 'https://github.com/example/sandbox/pull/77', branch: 'design-engine/page-science-live',
+      pageName: body.pageName, slug: 'science', plan: body.plan,
+      sections: planned.map(({ sectionType }) => ({ sectionType, previewHtml: '<main>Generated</main>', scorecard: { score: 96, issues: [] } })),
+      pageJson: { sections: {}, order: [] }, scorecard: { pageScore: 94, failures: [] }, warnings: []
+    }) };
+  };
   const { plan } = await planPage({ pageName: 'Science LP', intake: { brief: { text: '# Brief' } } });
-  assert.equal(plan.sections.length, 12);
-  assert.equal(plan.sections[1].sectionType, 'hero');
-  assert.equal(plan.sections[3].sectionType, 'benefits');
-  assert.equal(plan.sections[5].sectionType, 'ingredient-story');
+  assert.equal(plan.sections.length, 1);
+  assert.equal(plan.sections[0].sectionType, 'hero');
 
   const progress = [];
   const result = await generatePage({ pageName: 'Science LP', intake: { brief: { text: '# Brief' } }, plan, mode: 'page' }, (index) => progress.push(index));
-  assert.equal(result.sections.length, 12);
-  assert.equal(result.scorecard.sections.length, 12);
-  assert.equal(result.scorecard.pageScore, 92);
-  assert.match(result.prUrl, /design-engine-sandbox/);
-  assert.ok(result.pageJson.includes('science-results'));
-  assert.deepEqual(progress, [0, 1, 2, 3, 4]);
+  assert.equal(result.sections.length, 1);
+  assert.equal(result.scorecard.sections.length, 1);
+  assert.equal(result.scorecard.pageScore, 94);
+  assert.match(result.prUrl, /pull\/77/);
+  assert.deepEqual(progress, [0]);
+  assert.equal(calls[1].plan.sections[0].sectionType, 'hero');
 
   const quickProgress = [];
   const quick = await generatePage({ pageName: 'Science LP', intake: { wireframes: [{ imageBase64: 'AA==', imageMediaType: 'image/png', label: 'frame' }] }, plan: { sections: [] }, mode: 'section' }, (index) => quickProgress.push(index));
   assert.equal(quick.sections.length, 1);
-  assert.equal(quick.sections[0].sectionType, 'science-results');
-  assert.equal(quick.sections[0].preview.variant, 'science');
-  assert.deepEqual(quickProgress, [0, 1, 2]);
+  assert.equal(quick.sections[0].sectionType, 'quick-section');
+  assert.deepEqual(quickProgress, [0]);
 
   const tweakProgress = [];
   const tweak = await generatePage({ pageName: 'Science LP', intake: { referenceUrl: 'https://example.com', freeText: 'Tighten spacing' }, plan: { sections: [] }, mode: 'tweak' }, (index) => tweakProgress.push(index));
   assert.equal(tweak.sections[0].sectionType, 'targeted-update');
-  assert.deepEqual(tweakProgress, [0, 1, 2, 3]);
+  assert.deepEqual(tweakProgress, [0]);
 });
 
 test('live response normalization consumes per-section scorecards', () => {
@@ -139,7 +156,7 @@ test('static shell stays build-free and preserves accessibility hooks', () => {
   assert.match(html, /<main id="stage" tabindex="-1">/);
   assert.match(html, /<title>Foundry<\/title>/);
   assert.match(html, /aria-label="Foundry home"/);
-  assert.match(html, /<script type="module" src="\.\/src\/render\.js\?v=resources-1">/);
+  assert.match(html, /<script type="module" src="\.\/src\/render\.js\?v=live-1">/);
   assert.match(html, /id="step-rail"[^>]+aria-label="Build progress"/);
   assert.match(css, /:focus-visible/);
   assert.match(css, /prefers-reduced-motion:reduce/);
