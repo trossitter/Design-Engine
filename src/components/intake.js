@@ -1,5 +1,5 @@
-import { state, hasIntake } from '../state.js?v=resources-1';
-import { sourceLibraryView } from './resources.js?v=resources-1';
+import { state, hasIntake } from '../state.js?v=live-1';
+import { sourceLibraryView } from './resources.js?v=live-1';
 
 const labels = { brief: 'Brief', wireframe: 'Wireframe', figma: 'Figma', reference: 'Ref URL' };
 const esc = (value = '') => String(value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));

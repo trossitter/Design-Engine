@@ -1,9 +1,8 @@
-import { state, subscribe, setRoute, resetMode, setTheme, notify, contractIntake, resourceContext } from './state.js?v=resources-1';
-import { routes, go, nextStep, startRouter } from './router.js?v=resources-1';
-import { planPage, generatePage } from './api.js?v=resources-1';
-import { intakeView } from './components/intake.js?v=resources-1';
-import { reviewView } from './components/review.js?v=resources-1';
-import { rankTestimonials } from './components/resources.js?v=resources-1';
+import { state, subscribe, setRoute, resetMode, setTheme, notify, contractIntake, resourceContext } from './state.js?v=live-1';
+import { routes, go, nextStep, startRouter } from './router.js?v=live-1';
+import { planPage, generatePage } from './api.js?v=live-1';
+import { intakeView } from './components/intake.js?v=live-1';
+import { reviewView } from './components/review.js?v=live-1';
 
 const stage = document.querySelector('#stage');
 const rail = document.querySelector('#step-rail');
@@ -45,7 +44,28 @@ function hubView() { return `<section class="surface hub-surface"><div class="hu
   <a class="mode-card mode-card--tweak" href="#/tweak/target"><span class="mode-card__icon" aria-hidden="true">↝</span><h2>Tweak in words</h2><p>Describe the change.</p><span class="mode-card__go">Refine a page <b>→</b></span></a>
   </div></section>`; }
 
-function planView() { return `<a class="crumb" href="#/page/brief">← Back to the inputs</a><section class="surface"><p class="eyebrow">Full page · Plan</p><h1 class="step-h">Page blueprint</h1><div class="plan-vibe"><span><b>${state.plan.sections.length}</b> sections</span></div><div class="plan-list">${state.plan.sections.map((s, i) => `<div class="plan-row"><div class="plan-move"><button data-plan-move="${i}" data-direction="up" aria-label="Move ${escapeAttr(s.sectionType)} up" ${i === 0 ? 'disabled' : ''}>↑</button><button data-plan-move="${i}" data-direction="down" aria-label="Move ${escapeAttr(s.sectionType)} down" ${i === state.plan.sections.length - 1 ? 'disabled' : ''}>↓</button></div><input data-plan-type="${i}" aria-label="Section ${i + 1} type" value="${escapeAttr(s.sectionType)}"><input data-plan-intent="${i}" aria-label="Section ${i + 1} intent" value="${escapeAttr(s.intent)}"><button class="plan-remove" data-plan-remove="${i}" aria-label="Remove ${escapeAttr(s.sectionType)}">×</button></div>`).join('')}</div><div class="actions"><button class="btn btn--ghost" id="add-section">+ Add a section</button><button class="btn btn--primary" id="build-page" ${state.plan.sections.length ? '' : 'disabled'}>Start forging →</button></div></section>`; }
+function planView() {
+  const facts = state.plan.facts || [];
+  const unresolved = facts.filter((fact) => !['approved', 'excluded'].includes(fact.status));
+  const decisions = state.plan.decisions || [];
+  const risks = state.plan.risks || [];
+  const incomplete = state.plan.incompleteCopy || [];
+  return `<a class="crumb" href="#/page/brief">← Back to the inputs</a><section class="surface">
+    <p class="eyebrow">Full page · Plan</p><h1 class="step-h">Page blueprint</h1>
+    ${state.plan.summary ? `<p class="plan-summary">${escapeHtml(state.plan.summary)}</p>` : ''}
+    <div class="plan-vibe"><span><b>${state.plan.sections.length}</b> sections</span><span><b>${facts.length}</b> sourced facts</span>${unresolved.length ? `<span class="plan-vibe--warn"><b>${unresolved.length}</b> to decide</span>` : ''}</div>
+    ${decisions.length ? `<div class="read-receipt"><p class="receipt-label">Decisions</p>${decisions.map((decision) => `<div class="receipt-row"><strong>${escapeHtml(decision.label)}</strong><span>${escapeHtml(decision.rationale)}</span></div>`).join('')}</div>` : ''}
+    <div class="plan-list">${state.plan.sections.map((s, i) => `<div class="plan-row"><div class="plan-move"><button data-plan-move="${i}" data-direction="up" aria-label="Move ${escapeAttr(s.sectionType)} up" ${i === 0 ? 'disabled' : ''}>↑</button><button data-plan-move="${i}" data-direction="down" aria-label="Move ${escapeAttr(s.sectionType)} down" ${i === state.plan.sections.length - 1 ? 'disabled' : ''}>↓</button></div><input data-plan-type="${i}" aria-label="Section ${i + 1} type" value="${escapeAttr(s.sectionType)}"><input data-plan-intent="${i}" aria-label="Section ${i + 1} intent" value="${escapeAttr(s.intent)}"><button class="plan-remove" data-plan-remove="${i}" aria-label="Remove ${escapeAttr(s.sectionType)}">×</button></div>`).join('')}</div>
+    ${facts.length ? `<section class="evidence-panel"><div class="evidence-head"><p class="receipt-label">Sources &amp; facts</p><span>${unresolved.length ? `${unresolved.length} awaiting your call` : 'Confirmed'}</span></div><div class="fact-grid">${facts.map(factCard).join('')}</div></section>` : ''}
+    ${(risks.length || incomplete.length) ? `<details class="risk-list"><summary>Risks &amp; gaps · ${risks.length + incomplete.length}</summary><ul>${[...risks, ...incomplete].map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></details>` : ''}
+    <div class="actions"><button class="btn btn--ghost" id="add-section">+ Add a section</button><button class="btn btn--primary" id="build-page" ${state.plan.sections.length && !unresolved.length ? '' : 'disabled'}>Start forging →</button></div>
+  </section>`;
+}
+
+function factCard(fact, index) {
+  const status = fact.status || 'needs-review';
+  return `<article class="fact-card fact-card--${escapeAttr(status)}"><div class="fact-card__top"><strong>${escapeHtml(fact.label)}</strong><span>${status === 'approved' ? 'Approved' : status === 'excluded' ? 'Excluded' : 'Review'}</span></div><p>${escapeHtml(fact.value)}</p>${fact.useFor ? `<small>Use for · ${escapeHtml(fact.useFor)}</small>` : ''}${fact.source ? `<small>Source · ${escapeHtml(fact.source)}</small>` : ''}<div class="fact-actions"><button class="mini-action" data-fact-decision="approved" data-fact-index="${index}" aria-pressed="${status === 'approved'}">Approve</button><button class="mini-action" data-fact-decision="excluded" data-fact-index="${index}" aria-pressed="${status === 'excluded'}">Exclude</button></div></article>`;
+}
 
 function tweakTargetView() { return `<a class="crumb" href="#/">← All modes</a><section class="surface"><p class="eyebrow">Tweak · Target</p><h1 class="step-h">What should change?</h1><div class="field"><label class="lbl" for="target-url">Page or preview URL</label><input id="target-url" type="url" value="${escapeAttr(state.intake.referenceUrl)}" placeholder="https://preview.example.com/page"></div><div class="actions"><button class="btn btn--primary" id="target-next" ${state.intake.referenceUrl ? '' : 'disabled'}>Describe the tweak →</button></div></section>`; }
 function tweakDescribeView() { return `<a class="crumb" href="#/tweak/target">← Target</a><section class="surface"><p class="eyebrow">Tweak · Describe</p><h1 class="step-h">Describe the change</h1><div class="field"><label class="lbl" for="tweak-text">Change request</label><textarea id="tweak-text" placeholder="Tighten the mobile spacing and make the CTA more direct.">${escapeHtml(state.intake.freeText)}</textarea></div><div class="actions"><button class="btn btn--primary" id="tweak-build" ${state.intake.freeText ? '' : 'disabled'}>Build update →</button></div></section>`; }
@@ -97,7 +117,7 @@ function bindIntake() {
   file?.addEventListener('change', () => addFiles(file.files));
   document.querySelectorAll('[data-remove-wireframe]').forEach((button) => button.addEventListener('click', () => { state.intake.wireframes.splice(Number(button.dataset.removeWireframe), 1); notify(); }));
   document.querySelectorAll('[data-remove-source]').forEach((button) => button.addEventListener('click', () => { removeSource(button.dataset.removeSource); notify(); }));
-  document.querySelector('#intake-next')?.addEventListener('click', async () => { if (state.mode === 'section') return beginBuild(); const button = document.querySelector('#intake-next'); button.disabled = true; button.textContent = 'Planning…'; try { const response = await planPage({ pageName: state.intake.pageName, intake: contractIntake(), resourceContext: resourceContext() }); state.plan = response.plan; go('page', 'plan'); } catch (error) { say(error.message); button.disabled = false; button.textContent = 'Create page plan →'; } });
+  document.querySelector('#intake-next')?.addEventListener('click', async () => { if (state.mode === 'section') return beginBuild(); const button = document.querySelector('#intake-next'); button.disabled = true; button.textContent = 'Planning…'; try { const response = await planPage({ pageName: state.intake.pageName, intake: contractIntake(), resourceContext: resourceContext() }); state.plan = response.plan; state.plan.facts = (state.plan.facts || []).map((fact) => ({ ...fact, status: 'needs-review' })); go('page', 'plan'); } catch (error) { say(error.message); button.disabled = false; button.textContent = 'Create page plan →'; } });
   bindResourceLibrary();
 }
 function bindResourceLibrary() {
@@ -111,9 +131,8 @@ function bindResourceLibrary() {
     if (!['http:', 'https:'].includes(parsed.protocol)) return say('Use an http or https source link');
     const kind = document.querySelector('#resource-kind').value;
     const id = resourceId();
-    state.intake.resources.push({ id, kind, sourceType: 'link', label: linkedSourceLabel(kind, parsed), url: parsed.href, access: 'checking' });
+    state.intake.resources.push({ id, kind, sourceType: 'link', label: linkedSourceLabel(kind, parsed), url: parsed.href, access: 'unchecked' });
     notify();
-    setTimeout(() => { const resource = state.intake.resources.find((item) => item.id === id); if (!resource) return; resource.access = 'ready'; notify(); }, reduced() ? 40 : 650);
   });
   const resourceDrop = document.querySelector('#resource-drop');
   const resourceFiles = document.querySelector('#resource-files');
@@ -124,8 +143,7 @@ function bindResourceLibrary() {
   resourceFiles?.addEventListener('change', () => addResourceFiles(resourceFiles.files));
   document.querySelectorAll('[data-resource-remove]').forEach((button) => button.addEventListener('click', () => { state.intake.resources = state.intake.resources.filter((resource) => resource.id !== button.dataset.resourceRemove); notify(); }));
   const intent = document.querySelector('#testimonial-intent');
-  intent?.addEventListener('input', (event) => { state.intake.testimonialIntent = event.target.value; document.querySelector('#testimonial-rank').disabled = !event.target.value.trim(); });
-  document.querySelector('#testimonial-rank-form')?.addEventListener('submit', (event) => { event.preventDefault(); const matches = rankTestimonials(state.intake.testimonialIntent); state.intake.testimonialSelections = matches.slice(0, 2).map((item) => item.id); notify(); });
+  intent?.addEventListener('input', (event) => { state.intake.testimonialIntent = event.target.value; });
   document.querySelectorAll('[data-testimonial-pick]').forEach((input) => input.addEventListener('change', () => { const id = input.dataset.testimonialPick; state.intake.testimonialSelections = input.checked ? [...new Set([...state.intake.testimonialSelections, id])] : state.intake.testimonialSelections.filter((item) => item !== id); notify(); }));
 }
 function bindPlan() {
@@ -134,6 +152,7 @@ function bindPlan() {
   document.querySelectorAll('[data-plan-remove]').forEach((button) => button.addEventListener('click', () => { state.plan.sections.splice(Number(button.dataset.planRemove), 1); notify(); }));
   document.querySelectorAll('[data-plan-move]').forEach((button) => button.addEventListener('click', () => { const from = Number(button.dataset.planMove); const to = button.dataset.direction === 'up' ? from - 1 : from + 1; if (to < 0 || to >= state.plan.sections.length) return; const [section] = state.plan.sections.splice(from, 1); state.plan.sections.splice(to, 0, section); notify(); }));
   document.querySelector('#add-section')?.addEventListener('click', () => { if (state.plan.sections.length >= 14) return say('The Phase 1 limit is 14 sections'); state.plan.sections.push({ sectionType: 'new-section', intent: 'Describe the purpose of this section' }); notify(); });
+  document.querySelectorAll('[data-fact-decision]').forEach((button) => button.addEventListener('click', () => { const fact = state.plan.facts?.[Number(button.dataset.factIndex)]; if (!fact) return; fact.status = button.dataset.factDecision; notify(); }));
   document.querySelector('#build-page')?.addEventListener('click', beginBuild);
 }
 async function beginBuild() {
